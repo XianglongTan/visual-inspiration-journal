@@ -1,0 +1,5 @@
+{
+  "name": "DesignLog - AI Design Journal",
+  "description": "A weekly planner-style clipboard for design inspiration. Upload images, and AI generates design terminology tags automatically.",
+  "requestFramePermissions": []
+}

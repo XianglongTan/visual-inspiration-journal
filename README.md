@@ -1,0 +1,182 @@
+# DesignLog - 灵感剪切板 (AI 辅助)
+
+**产品与技术交接文档**
+
+## 1. 产品概述
+
+**DesignLog** 是一个基于周视图的视觉灵感手账应用。主要面向设计师和创意工作者，用于收集日常的 UI/UX 灵感截图。核心差异化功能是利用 Google Gemini AI 自动识别上传的图片，并生成专业的 UI 设计术语标签，帮助用户建立结构化的灵感库。
+
+### 核心功能
+*   **周视图布局**：固定显示周一至周五 + 周末（六日合并）的网格视图。
+*   **双列网格展示**：每天的卡片区域采用双列布局（Grid Layout），支持大量图片排版。
+*   **AI 智能标注**：图片上传后自动调用 Gemini API，生成 5-10 个设计术语（如 "Glassmorphism", "Brutalism"）。
+*   **本地持久化存储**：利用 IndexedDB 存储高清图片和数据，无需后端服务器，隐私安全且容量大。
+*   **交互细节**：
+    *   拟物化拍立得（Polaroid）风格卡片。
+    *   随机生成的彩色图钉装饰。
+    *   可拖拽调整高度的底部笔记区。
+    *   悬停展开标签、复制标签、删除功能。
+
+---
+
+## 2. 技术架构
+
+该项目目前为 **纯前端单页应用 (SPA)**，无传统后端数据库，数据存储在用户浏览器本地。
+
+### 技术栈
+*   **核心框架**: React 18
+*   **构建工具**: Vite (ES Modules)
+*   **语言**: TypeScript
+*   **样式**: Tailwind CSS (原子化 CSS)
+*   **图标库**: Lucide React
+*   **AI SDK**: `@google/genai` (Google Gemini SDK)
+*   **本地存储**: `idb-keyval` (IndexedDB 的轻量级封装)
+
+### 目录结构说明
+
+```
+/
+├── index.html            # 入口文件 (含 Import Maps 依赖管理)
+├── index.tsx             # React 挂载点
+├── App.tsx               # 核心应用逻辑、状态管理、数据加载
+├── config.ts             # 配置文件 (API Key, Prompt, 模型设置)
+├── types.ts              # TypeScript 类型定义 (核心数据模型)
+├── metadata.json         # 应用元数据
+│
+├── components/           # UI 组件
+│   ├── Header.tsx        # 顶部导航 (切换周、回到今天)
+│   ├── DayCell.tsx       # 单日容器 (处理拖拽、上传、网格布局)
+│   ├── PolaroidCard.tsx  # 图片卡片组件 (展示、悬停交互、删除)
+│   └── NotesArea.tsx     # 底部可拖拽笔记区
+│
+└── services/
+    └── geminiService.ts  # Gemini API 调用逻辑 (Base64处理, Prompt发送)
+```
+
+---
+
+## 3. 数据模型与存储
+
+### 数据持久化策略
+*   **方案**: IndexedDB (通过 `idb-keyval` 库操作)
+*   **原因**: `localStorage` 仅有 5MB 限制，无法存储大量 Base64 图片数据。IndexedDB 支持大容量存储（通常 > 500MB）。
+*   **键名**: `designlog_v1_data`
+*   **迁移机制**: 应用启动时会自动检查 `localStorage` 是否有旧数据，若有则自动迁移至 `IndexedDB`。
+
+### 核心数据结构 (`types.ts`)
+
+**1. WeekData (周数据)**
+以 `YYYY-Www` 格式（如 "2023-10-24" 周一的日期）为 Key 存储每周数据。
+```typescript
+interface WeekData {
+  id: string; 
+  days: {
+    0: ImageCard[]; // 周一
+    1: ImageCard[]; // 周二
+    // ...
+    5: ImageCard[]; // 周末
+  };
+  notes: string;      // 底部笔记内容
+  notesHeight: number; // 笔记区高度状态
+}
+```
+
+**2. ImageCard (图片卡片)**
+```typescript
+interface ImageCard {
+  id: string;       // UUID
+  url: string;      // 图片的 Base64 字符串
+  terms: Term[];    // AI 生成的术语列表
+  createdAt: number;
+  rotation: number;     // 随机旋转角度 (-2deg ~ 2deg)
+  decorationType: 'pin'; // 装饰类型
+  decorationColor: string; // 随机图钉颜色
+  isLoading: boolean;   // AI 分析中的加载状态
+}
+```
+
+---
+
+## 4. AI 模块说明
+
+### 配置 (`config.ts`)
+*   **Model**: `gemini-3-flash-preview` (选用 Flash 模型以平衡速度和多模态能力)
+*   **Temperature**: `0.4` (较低的随机性，保证术语生成的专业和准确性)
+*   **Max Terms**: 10 个标签
+
+### 提示词策略 (Prompt Engineering)
+当前使用的 Prompt 专门针对 UI/UX 场景进行了优化：
+> "请基于这张截图的具体使用场景和界面语境，从专业UI/视觉设计角度，提炼5-10个最关键的设计关键词。关键解析设计中的布局结构、组件形态、字体、颜色、材质、层级关系、交互的定义，避免抽象评价，需直接可用于复刻或检索类似设计。用中文。"
+
+### 调用流程
+1.  用户上传图片。
+2.  前端将图片转换为 Base64。
+3.  UI 立即显示卡片（Loading 状态）。
+4.  调用 `geminiService.generateDesignTerms`。
+5.  Gemini 返回 JSON 格式的术语数组。
+6.  更新 IndexedDB 中的卡片数据，移除 Loading 状态。
+
+---
+
+## 5. 开发与部署
+
+### 依赖安装
+由于使用了 Import Maps (CDN 引用)，**无需 `npm install`** 庞大的 node_modules 即可运行源码。
+但如果进行本地开发，建议使用 standard Vite setup。
+
+### 运行环境
+需确保 `config.ts` 中配置了有效的 Google Gemini API Key。
+
+```typescript
+// config.ts
+export const APP_CONFIG = {
+  API_KEY: 'YOUR_API_KEY_HERE', 
+  // ...
+};
+```
+
+### 样式定制
+使用了 Tailwind CSS v4。如需修改主题色（如背景色），请在 `index.css` 的 `@theme` 中修改变量。
+
+### Chrome 浏览器扩展
+
+项目支持打包为 Chrome 扩展，点击扩展图标即可在新标签页打开完整手账。
+
+**打包步骤：**
+1. 执行 `npm run build` 或 `npm run build:extension`。
+2. 打开 Chrome → 地址栏输入 `chrome://extensions/`。
+3. 开启右上角「开发者模式」→「加载已解压的扩展程序」→ 选择项目下的 **`dist`** 目录。
+
+**说明：** 扩展使用与网页版相同的数据逻辑（IndexedDB），API Key 仍在 `config.ts` 中配置；构建后 `dist` 内已包含 `manifest.json`、`background.js` 与 **`content.js`**（用于在任意网页注入「截图」悬浮按钮）。
+
+**若只有插件页显示悬浮按钮、其他网页不显示：** 请确认 (1) 已执行 `npm run build` 或 `npm run build:extension`（会生成 `dist/content.js`），(2) 在 Chrome 中加载的是 **`dist`** 目录而非 `public` 或项目根目录。只有从 `dist` 加载且构建完整时，content script 才会在普通网页（如百度、GitHub）注入悬浮截图按钮；`chrome://`、扩展商店等系统页无法注入。
+
+### 发布给其他人使用
+
+**方式一：Chrome 网上应用店（推荐，面向公众）**
+
+1. 注册 [Chrome 开发者账号](https://chrome.google.com/webstore/devconsole)（一次性约 $5 美元）。
+2. 打包扩展：先执行 `npm run build:extension`，再将 **`dist` 目录整体打成 zip**（zip 根目录里要有 `manifest.json`、`index.html`、`background.js`、`assets/` 等）。
+3. 在 [Chrome Web Store 开发者后台](https://chrome.google.com/webstore/devconsole) 选择「新项目」→ 上传该 zip。
+4. 填写商店信息：描述、截图、隐私说明等；若扩展会请求网络（如调用 NVIDIA API），需在隐私说明中写明。
+5. 提交审核，通过后任何人可在商店搜索安装。
+
+**方式二：直接分发 zip（小范围、内部使用）**
+
+1. **一键打包（推荐）**：在项目根目录双击 **`pack-extension.bat`**（Windows），会先执行 `npm run build:extension`，再生成 **`DesignLog-extension.zip`**。或将 `pack-extension.ps1` 在 PowerShell 中运行亦可。
+2. 将生成的 **`DesignLog-extension.zip`** 发给对方。
+3. 对方解压后，在 Chrome 打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压出来的 **`dist`** 文件夹。
+4. **配置**：API Key、Model、Prompt 等均在扩展内的「配置」页填写，对方安装后点右上角齿轮自行填写即可，无需改代码。
+
+**安全提醒**：公开上架建议通过自有后端代理 API，避免用户在前端填写的 Key 被滥用；内部分发时提醒对方妥善保管自己的 API Key。
+
+---
+
+## 6. 已知限制与待办事项 (TODO)
+
+1.  **数据同步**: 目前数据仅存储在当前浏览器。更换设备或清空浏览器缓存会导致数据丢失。
+    *   *建议*: 未来接入 Supabase 或 Firebase 实现云端同步。
+2.  **图片压缩**: 目前存储原图 Base64，随着时间推移可能会占用较多 IndexedDB 空间。
+    *   *建议*: 上传前在 Canvas 中进行压缩处理。
+3.  **API Key 安全**: API Key 目前暴露在前端代码中。
+    *   *建议*: 仅供个人使用或演示。生产环境需通过 Netlify/Vercel Functions 转发请求。
