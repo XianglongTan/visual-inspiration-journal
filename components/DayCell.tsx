@@ -5,12 +5,14 @@ import { Plus } from 'lucide-react';
 
 interface DayCellProps {
   dayName: string;
-  dateNumber: number; // New prop for the big date number
+  dateNumber: number;
   dayIndex: DayIndex;
   cards: ImageCard[];
   onUpload: (file: File, dayIndex: DayIndex) => void;
   onDeleteCard: (cardId: string, dayIndex: DayIndex) => void;
   onDeleteTerm: (cardId: string, termId: string, dayIndex: DayIndex) => void;
+  onEditTerm: (cardId: string, termId: string, newText: string, dayIndex: DayIndex) => void;
+  onAddTerm: (cardId: string, text: string, dayIndex: DayIndex) => void;
   onFocusForPaste?: () => void;
   onBlurForPaste?: () => void;
   isWeekend?: boolean;
@@ -24,6 +26,8 @@ const DayCell: React.FC<DayCellProps> = ({
   onUpload,
   onDeleteCard,
   onDeleteTerm,
+  onEditTerm,
+  onAddTerm,
   onFocusForPaste,
   onBlurForPaste,
   isWeekend 
@@ -109,6 +113,8 @@ const DayCell: React.FC<DayCellProps> = ({
                     card={card}
                     onDeleteCard={() => onDeleteCard(card.id, dayIndex)}
                     onDeleteTerm={(termId) => onDeleteTerm(card.id, termId, dayIndex)}
+                    onEditTerm={(termId, newText) => onEditTerm(card.id, termId, newText, dayIndex)}
+                    onAddTerm={(text) => onAddTerm(card.id, text, dayIndex)}
                   />
                 </div>
               ))}

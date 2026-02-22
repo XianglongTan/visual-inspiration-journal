@@ -14,10 +14,8 @@ export interface ImageCard {
   isLoading: boolean;
 }
 
-// 0-6 where 0 is Monday, 6 is Sunday. 
-// However, our layout merges Sat/Sun. 
-// Data structure: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Weekend
-export type DayIndex = 0 | 1 | 2 | 3 | 4 | 5;
+// 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+export type DayIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface WeekData {
   id: string; // "YYYY-Www" format
