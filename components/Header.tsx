@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Grid, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Grid, Settings, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   currentDate: Date;
@@ -7,9 +7,10 @@ interface HeaderProps {
   onNextWeek: () => void;
   onToday: () => void;
   onOpenConfig: () => void;
+  onOpenInsights: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, onToday, onOpenConfig }) => {
+const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, onToday, onOpenConfig, onOpenInsights }) => {
   const getMonthYear = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
@@ -45,6 +46,14 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, on
           className="px-4 py-1.5 bg-white border border-stone-200 text-stone-600 text-xs font-semibold rounded-full shadow-sm hover:bg-stone-50 transition-colors uppercase tracking-wider"
         >
           Today
+        </button>
+        <button
+          onClick={onOpenInsights}
+          className="p-2 text-stone-400 hover:text-amber-500 rounded-full hover:bg-amber-50 transition-colors"
+          title="审美 DNA 词云"
+          aria-label="审美洞察"
+        >
+          <Sparkles size={20} />
         </button>
         <button
           onClick={onOpenConfig}

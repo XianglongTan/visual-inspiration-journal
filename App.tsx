@@ -5,6 +5,7 @@ import NotesArea from './components/NotesArea';
 import ConfigModal from './components/ConfigModal';
 import ScreenshotOverlay from './components/ScreenshotOverlay';
 import FloatingCaptureButton from './components/FloatingCaptureButton';
+import TermsInsightModal from './components/TermsInsightModal';
 import { generateDesignTerms } from './services/cerebrasService';
 import { WeekData, DayIndex, ImageCard } from './types';
 import { v4 as uuidv4 } from 'uuid';
@@ -61,6 +62,7 @@ function App() {
   const [data, setData] = useState<{ [weekId: string]: WeekData }>({});
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [insightsModalOpen, setInsightsModalOpen] = useState(false);
   const [pasteTargetDay, setPasteTargetDay] = useState<DayIndex | null>(null);
   const [screenshotMode, setScreenshotMode] = useState(false);
 
@@ -364,9 +366,15 @@ function App() {
         onNextWeek={() => changeWeek(1)}
         onToday={goToToday}
         onOpenConfig={() => setConfigModalOpen(true)}
+        onOpenInsights={() => setInsightsModalOpen(true)}
       />
 
       <ConfigModal isOpen={configModalOpen} onClose={() => setConfigModalOpen(false)} />
+      <TermsInsightModal
+        isOpen={insightsModalOpen}
+        onClose={() => setInsightsModalOpen(false)}
+        data={data}
+      />
 
       {screenshotMode && (
         <ScreenshotOverlay
