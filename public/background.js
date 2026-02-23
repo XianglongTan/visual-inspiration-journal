@@ -73,4 +73,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       });
     return true;
   }
+
+  if (msg.type === 'SAVE_IMAGE_URL' && msg.url) {
+    imageUrlToDataUrl(msg.url)
+      .then((dataUrl) => chrome.storage.local.set({ pendingScreenshot: dataUrl }))
+      .then(() => openOrFocusJournal())
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => {
+        console.error('DesignLog: failed to save image from URL', err);
+        sendResponse({ ok: false, error: err.message });
+      });
+    return true;
+  }
 });

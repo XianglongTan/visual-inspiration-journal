@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+当用户说‘任务完成’后，commit这次任务，commit message 用英文写

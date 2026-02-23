@@ -657,6 +657,7 @@ function init(): void {
   }
   try {
     run();
+    initImageHover();
   } catch (e) {
     console.error('DesignLog content script failed:', e);
   }
