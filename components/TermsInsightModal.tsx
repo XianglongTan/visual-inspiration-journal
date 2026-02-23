@@ -73,7 +73,17 @@ const buildRows = (terms: TermFrequency[]): TermFrequency[][] => {
   return rows;
 };
 
-const MAX_WORDS = 20;
+const MIN_WORDS = 20;
+
+// 50th percentile (median) of an array of numbers
+const percentile50 = (sortedAsc: number[]): number => {
+  const n = sortedAsc.length;
+  if (n === 0) return 0;
+  const mid = n / 2;
+  return n % 2 === 1
+    ? sortedAsc[Math.floor(mid)]
+    : (sortedAsc[mid - 1] + sortedAsc[mid]) / 2;
+};
 
 const TermsInsightModal: React.FC<TermsInsightModalProps> = ({ isOpen, onClose, data }) => {
   const { termFrequencies, totalImages } = useMemo(() => {
@@ -93,10 +103,19 @@ const TermsInsightModal: React.FC<TermsInsightModalProps> = ({ isOpen, onClose, 
       });
     });
 
-    const termFrequencies: TermFrequency[] = Object.entries(freq)
+    const sorted: TermFrequency[] = Object.entries(freq)
       .map(([text, count]) => ({ text, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, MAX_WORDS);
+      .sort((a, b) => b.count - a.count);
+
+    if (sorted.length === 0) return { termFrequencies: [], totalImages };
+
+    const countsAsc = [...sorted].map(t => t.count).sort((a, b) => a - b);
+    const p50 = percentile50(countsAsc);
+    const byP50 = sorted.filter(t => t.count >= p50);
+    const termFrequencies =
+      byP50.length < MIN_WORDS
+        ? sorted.slice(0, Math.min(MIN_WORDS, sorted.length))
+        : byP50;
 
     return { termFrequencies, totalImages };
   }, [data]);
