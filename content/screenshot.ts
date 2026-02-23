@@ -498,7 +498,7 @@ function getOrCreateImgSavePill(): HTMLDivElement {
       stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 5v14M5 12l7 7 7-7"/>
     </svg>
-    保存到 DesignLog
+    保存到视觉灵感手账
   `;
   imgSavePill.style.opacity = '0';
   imgSavePill.style.pointerEvents = 'none';

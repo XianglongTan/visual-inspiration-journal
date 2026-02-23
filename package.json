@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/ensure-config.mjs",
+    "prebuild": "node scripts/ensure-config.mjs",
     "dev": "vite",
     "build": "vite build && vite build --config vite.content.config.ts",
     "preview": "vite preview",

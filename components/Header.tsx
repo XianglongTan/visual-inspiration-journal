@@ -21,7 +21,7 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, on
         {/* Logo Area */}
         <div className="flex items-center gap-2 text-stone-800">
           <Grid size={20} strokeWidth={2.5} />
-          <h1 className="font-sans text-xl font-bold tracking-tight">DesignLog</h1>
+          <h1 className="font-sans text-xl font-bold tracking-tight">视觉灵感手账</h1>
         </div>
       </div>
 

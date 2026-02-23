@@ -1,11 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { APP_CONFIG } from "../config";
 
+const cfg = APP_CONFIG as typeof APP_CONFIG & { API_KEY?: string; GEMINI?: { MODEL_NAME: string; PROMPT: string; TEMPERATURE: number; MAX_TERMS: number } };
+
 const getGeminiClient = () => {
-  const apiKey = APP_CONFIG.API_KEY;
-  if (!apiKey || apiKey.includes('Xxx')) {
-    console.warn("API_KEY appears to be invalid or a placeholder. Please check config.ts.");
-    // We continue to return the client to let the API throw the actual authentication error for debugging
+  const apiKey = cfg.API_KEY ?? '';
+  if (!apiKey || apiKey.includes('your-') || apiKey.includes('Xxx')) {
+    console.warn("Gemini API_KEY missing or placeholder. Add API_KEY and GEMINI to config.ts to use Gemini.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -23,15 +24,19 @@ const getMimeType = (dataUrl: string) => {
 };
 
 export const generateDesignTerms = async (imageBase64: string): Promise<string[]> => {
+  if (!cfg.GEMINI?.MODEL_NAME || !cfg.API_KEY) {
+    console.warn("Gemini not configured. Using CEREBRAS only or add GEMINI to config.ts.");
+    return [];
+  }
   const client = getGeminiClient();
 
   try {
     const mimeType = getMimeType(imageBase64);
     
-    console.log(`Analyzing image with model: ${APP_CONFIG.GEMINI.MODEL_NAME}, MimeType: ${mimeType}`);
+    console.log(`Analyzing image with model: ${cfg.GEMINI.MODEL_NAME}, MimeType: ${mimeType}`);
 
     const response = await client.models.generateContent({
-      model: APP_CONFIG.GEMINI.MODEL_NAME,
+      model: cfg.GEMINI.MODEL_NAME,
       contents: {
         parts: [
           {
@@ -41,7 +46,7 @@ export const generateDesignTerms = async (imageBase64: string): Promise<string[]
             },
           },
           {
-            text: APP_CONFIG.GEMINI.PROMPT,
+            text: cfg.GEMINI.PROMPT,
           },
         ],
       },
@@ -53,7 +58,7 @@ export const generateDesignTerms = async (imageBase64: string): Promise<string[]
                 type: Type.STRING
             }
         },
-        temperature: APP_CONFIG.GEMINI.TEMPERATURE,
+        temperature: cfg.GEMINI.TEMPERATURE,
       },
     });
 
@@ -64,7 +69,7 @@ export const generateDesignTerms = async (imageBase64: string): Promise<string[]
 
     const terms = JSON.parse(jsonText);
     if (Array.isArray(terms)) {
-      return terms.slice(0, APP_CONFIG.GEMINI.MAX_TERMS);
+      return terms.slice(0, cfg.GEMINI.MAX_TERMS);
     }
     return [];
 

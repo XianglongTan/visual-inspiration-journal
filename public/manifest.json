@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "DesignLog - AI 灵感手账",
+  "name": "视觉灵感手账",
   "version": "1.0.0",
   "description": "周视图视觉灵感手账，AI 自动识别截图并生成设计术语标签",
   "action": {
-    "default_title": "打开 DesignLog"
+    "default_title": "打开视觉灵感手账"
   },
   "background": {
     "service_worker": "background.js"
