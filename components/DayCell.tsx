@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ImageCard, DayIndex } from '../types';
 import PolaroidCard from './PolaroidCard';
-import { Plus } from 'lucide-react';
+import { Plus, Clipboard, ImagePlus } from 'lucide-react';
 
 interface DayCellProps {
   dayName: string;
@@ -16,6 +16,11 @@ interface DayCellProps {
   onFocusForPaste?: () => void;
   onBlurForPaste?: () => void;
   isWeekend?: boolean;
+}
+
+interface ContextMenuState {
+  x: number;
+  y: number;
 }
 
 const DayCell: React.FC<DayCellProps> = ({ 
@@ -33,6 +38,61 @@ const DayCell: React.FC<DayCellProps> = ({
   isWeekend 
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [pasteStatus, setPasteStatus] = useState<'idle' | 'loading' | 'no-image'>('idle');
+
+  const closeMenu = useCallback(() => {
+    setContextMenu(null);
+    setPasteStatus('idle');
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onClickOutside = () => closeMenu();
+    const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeydown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeydown);
+    };
+  }, [contextMenu, closeMenu]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 确保菜单不超出视口右侧/底部
+    const menuW = 200;
+    const menuH = 90;
+    const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+    setContextMenu({ x, y });
+    setPasteStatus('idle');
+  };
+
+  const handlePasteFromClipboard = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPasteStatus('loading');
+    try {
+      const clipItems = await navigator.clipboard.read();
+      for (const item of clipItems) {
+        const imageType = item.types.find(t => t.startsWith('image/'));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const ext = imageType.split('/')[1] || 'png';
+          const file = new File([blob], `paste.${ext}`, { type: imageType });
+          onUpload(file, dayIndex);
+          closeMenu();
+          return;
+        }
+      }
+      setPasteStatus('no-image');
+      setTimeout(closeMenu, 1800);
+    } catch {
+      setPasteStatus('no-image');
+      setTimeout(closeMenu, 1800);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -63,7 +123,8 @@ const DayCell: React.FC<DayCellProps> = ({
       onBlur={onBlurForPaste}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      title="支持拖入图片或先点击此处再 Ctrl+V 粘贴"
+      onContextMenu={handleContextMenu}
+      title="右键可粘贴图片 · 支持拖入图片或 Ctrl+V 粘贴"
     >
       {/* Header: Minimalist, Centered */}
       <div className="flex flex-col items-center justify-center py-6 group cursor-default relative">
@@ -90,6 +151,45 @@ const DayCell: React.FC<DayCellProps> = ({
           onChange={handleFileChange}
         />
       </div>
+
+      {/* Custom Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[9999] min-w-[180px] bg-white rounded-xl shadow-2xl border border-stone-100 py-1.5 overflow-hidden"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {/* Menu header */}
+          <div className="px-3 py-1.5 text-[10px] font-bold tracking-widest text-stone-300 uppercase select-none border-b border-stone-100 mb-1">
+            {dateNumber} {dayName}
+          </div>
+
+          {/* Paste option */}
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-stone-700 hover:bg-violet-50 hover:text-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={handlePasteFromClipboard}
+            disabled={pasteStatus === 'loading'}
+          >
+            <Clipboard size={14} className={pasteStatus === 'no-image' ? 'text-red-400' : 'text-violet-400'} />
+            <span>
+              {pasteStatus === 'loading' && '读取剪贴板…'}
+              {pasteStatus === 'no-image' && '剪贴板中没有图片'}
+              {pasteStatus === 'idle' && '粘贴图片到这天'}
+            </span>
+          </button>
+
+          {/* Upload option */}
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); closeMenu(); fileInputRef.current?.click(); }}
+          >
+            <ImagePlus size={14} className="text-amber-400" />
+            <span>从文件选择图片</span>
+          </button>
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="flex-1 relative">

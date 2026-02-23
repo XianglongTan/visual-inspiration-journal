@@ -35,6 +35,27 @@ function parseTermsFromResponse(text: string, maxTerms: number): string[] {
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * 将任意格式的 dataURL（包括 AVIF、WebP 等）用 canvas 转换为 JPEG dataURL。
+ * NVIDIA NIM 服务端用 Pillow 解码图片，不支持 AVIF/WebP 等现代格式，需要统一转为 JPEG。
+ */
+function convertToJpeg(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    img.onerror = () => resolve(dataUrl); // 转换失败则保留原图
+    img.src = dataUrl;
+  });
+}
+
+/**
  * 请求逻辑与 scripts/test_nv2.py 一致（NVIDIA NIM chat/completions）。
  * 使用用户配置（API Key、Model、Prompt），未配置时使用 config 默认值。
  */
@@ -45,7 +66,12 @@ export async function generateDesignTerms(imageBase64: string): Promise<string[]
     { type: "text", text: cfg.prompt },
   ];
   if (imageBase64?.trim()) {
-    const url = imageBase64.startsWith("data:") ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+    const rawUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+    const mimeMatch = rawUrl.match(/^data:([^;]+);/);
+    const mime = mimeMatch?.[1] ?? "";
+    const needsConvert = !["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mime);
+    const url = needsConvert ? await convertToJpeg(rawUrl) : rawUrl;
+    if (needsConvert) console.log("[LLM] 图片格式", mime, "已转换为 JPEG");
     userContent.push({ type: "image_url", image_url: { url } });
     console.log("[LLM] messages 已包含图片, data URL 长度:", url.length);
   } else {

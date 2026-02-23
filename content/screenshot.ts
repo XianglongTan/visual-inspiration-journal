@@ -199,11 +199,74 @@ function injectStyles(): void {
       font-size: 12px;
     }
   `;
+
+  // Image hover save button styles
+  const imgStyle = document.createElement('style');
+  imgStyle.id = 'designlog-img-hover-styles';
+  imgStyle.textContent = `
+    #designlog-img-save-pill {
+      position: fixed;
+      z-index: ${Z_BUTTON};
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px 5px 7px;
+      border-radius: 9999px;
+      background: linear-gradient(to bottom right, #ffe4e6, #fce7f3);
+      border: 1.5px solid rgba(255,255,255,0.9);
+      box-shadow: 0 4px 14px rgba(244,114,182,0.35);
+      color: #e11d48;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: system-ui, -apple-system, sans-serif;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      pointer-events: auto;
+      user-select: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      white-space: nowrap;
+    }
+    #designlog-img-save-pill:hover {
+      background: linear-gradient(to bottom right, #fecdd3, #fbcfe8);
+      transform: scale(1.04);
+    }
+    #designlog-img-save-pill:active { transform: scale(0.97); }
+    #designlog-img-save-pill svg { flex-shrink: 0; }
+  `;
+  document.head.appendChild(imgStyle);
+
   document.head.appendChild(style);
 }
 
 function cameraIconSvg(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`;
+}
+
+/** 短暂显示一条 toast 提示 */
+function showToast(message: string): void {
+  const existing = document.getElementById('designlog-toast');
+  existing?.remove();
+  const toast = document.createElement('div');
+  toast.id = 'designlog-toast';
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,27,24,0.82);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: ${Z_OVERLAY};
+    pointer-events: none;
+    font-family: system-ui, -apple-system, sans-serif;
+    white-space: nowrap;
+  `;
+  toast.textContent = message;
+  const container = document.getElementById(CONTAINER_ID);
+  (container ?? document.body).appendChild(toast);
+  setTimeout(() => toast.remove(), 2800);
 }
 
 /**
@@ -402,6 +465,114 @@ function showSelectionOverlay(src: HTMLCanvasElement): void {
   const container = document.getElementById(CONTAINER_ID);
   (container ?? document.body).appendChild(overlay);
 }
+
+// ─── Image hover save pill ───────────────────────────────────────────────────
+
+const MIN_IMG_SIZE = 80; // px — ignore tiny icons/avatars
+
+let imgSavePill: HTMLDivElement | null = null;
+let pillTargetImg: HTMLImageElement | null = null;
+let pillHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+function sendImageUrl(url: string): void {
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return;
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({ type: 'SAVE_IMAGE_URL', url }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('DesignLog:', chrome.runtime.lastError.message);
+        }
+      });
+    } catch (err) {
+      console.error('DesignLog: 扩展上下文已失效，请刷新页面后重试', err);
+    }
+  }
+}
+
+function getOrCreateImgSavePill(): HTMLDivElement {
+  if (imgSavePill) return imgSavePill;
+  imgSavePill = document.createElement('div');
+  imgSavePill.id = 'designlog-img-save-pill';
+  imgSavePill.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14M5 12l7 7 7-7"/>
+    </svg>
+    保存到 DesignLog
+  `;
+  imgSavePill.style.opacity = '0';
+  imgSavePill.style.pointerEvents = 'none';
+  document.body.appendChild(imgSavePill);
+
+  imgSavePill.addEventListener('mouseenter', () => {
+    if (pillHideTimer) { clearTimeout(pillHideTimer); pillHideTimer = null; }
+  });
+  imgSavePill.addEventListener('mouseleave', () => {
+    scheduleHidePill();
+  });
+  imgSavePill.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (pillTargetImg?.src) sendImageUrl(pillTargetImg.src);
+  });
+
+  return imgSavePill;
+}
+
+function showPillOnImg(img: HTMLImageElement): void {
+  const rect = img.getBoundingClientRect();
+  if (rect.width < MIN_IMG_SIZE || rect.height < MIN_IMG_SIZE) return;
+
+  pillTargetImg = img;
+  if (pillHideTimer) { clearTimeout(pillHideTimer); pillHideTimer = null; }
+
+  const pill = getOrCreateImgSavePill();
+  // Estimate pill width ~150px, height ~28px; clamp within viewport
+  const pillW = 156;
+  const pillH = 28;
+  const gap = 8;
+  let top = rect.bottom - pillH - gap;
+  let left = rect.right - pillW - gap;
+  if (left < gap) left = gap;
+  if (top < gap) top = gap;
+
+  pill.style.top = `${top}px`;
+  pill.style.left = `${left}px`;
+  pill.style.opacity = '1';
+  pill.style.pointerEvents = 'auto';
+}
+
+function scheduleHidePill(): void {
+  pillHideTimer = setTimeout(() => {
+    if (imgSavePill) {
+      imgSavePill.style.opacity = '0';
+      imgSavePill.style.pointerEvents = 'none';
+    }
+    pillTargetImg = null;
+    pillHideTimer = null;
+  }, 200);
+}
+
+function attachImgHoverListeners(img: HTMLImageElement): void {
+  if ((img as HTMLImageElement & { _dlAttached?: boolean })._dlAttached) return;
+  (img as HTMLImageElement & { _dlAttached?: boolean })._dlAttached = true;
+
+  img.addEventListener('mouseenter', () => showPillOnImg(img));
+  img.addEventListener('mouseleave', () => scheduleHidePill());
+}
+
+function scanAndAttach(): void {
+  document.querySelectorAll<HTMLImageElement>('img').forEach(attachImgHoverListeners);
+}
+
+function initImageHover(): void {
+  scanAndAttach();
+  // Watch for dynamically added images (e.g. Xiaohongshu lazy-loads)
+  const observer = new MutationObserver(() => scanAndAttach());
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function run(): void {
   injectStyles();

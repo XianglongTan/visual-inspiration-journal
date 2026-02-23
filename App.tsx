@@ -177,17 +177,26 @@ function App() {
     reader.readAsDataURL(file);
   };
 
-  // 全局粘贴：当某一天被聚焦时，粘贴的图片会添加到该天（必须在 handleUpload 定义之后）
+  // 全局粘贴：聚焦某天时粘贴到该天，否则粘贴到今天（输入框内不拦截）
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (pasteTargetDay === null) return;
+      // 用户正在输入框/文本区域/可编辑元素中，不拦截
+      const active = document.activeElement;
+      const isTyping =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active as HTMLElement | null)?.isContentEditable;
+      if (isTyping) return;
+
       const items = e.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.startsWith('image/')) {
           e.preventDefault();
           const file = items[i].getAsFile();
-          if (file) handleUpload(file, pasteTargetDay);
+          // 优先放到聚焦列，否则放到今天
+          const targetDay = pasteTargetDay ?? getTodayDayIndex();
+          if (file) handleUpload(file, targetDay);
           return;
         }
       }
