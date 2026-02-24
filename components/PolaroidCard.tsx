@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { ImageCard } from '../types';
-import { Trash2, Loader2, X, Pencil, Plus, Check } from 'lucide-react';
+import { Trash2, Loader2, X, Pencil, Plus, Check, RotateCw } from 'lucide-react';
 
 interface PolaroidCardProps {
   card: ImageCard;
@@ -9,9 +9,10 @@ interface PolaroidCardProps {
   onEditTerm: (termId: string, newText: string) => void;
   onAddTerm: (text: string) => void;
   onDeleteCard: () => void;
+  onRetryAnalysis?: () => void;
 }
 
-const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditTerm, onAddTerm, onDeleteCard }) => {
+const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditTerm, onAddTerm, onDeleteCard, onRetryAnalysis }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -117,7 +118,7 @@ const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditT
             `}
             onMouseEnter={() => setExpanded(true)}
           >
-            {/* Collapsed State: Main Term + Count */}
+            {/* Collapsed State: Main Term + Count + Retry */}
             {!expanded ? (
               <>
                 <span className="font-sans text-xs font-medium text-stone-700 truncate max-w-[100px]">
@@ -127,6 +128,15 @@ const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditT
                   <span className="text-[10px] text-stone-400 font-semibold">
                     +{card.terms.length - 1}
                   </span>
+                )}
+                {onRetryAnalysis && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRetryAnalysis(); }}
+                    className="ml-1 p-0.5 rounded text-stone-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                    title="重新用 AI 分析关键词"
+                  >
+                    <RotateCw size={10} />
+                  </button>
                 )}
               </>
             ) : (
@@ -204,12 +214,33 @@ const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditT
                     <span>添加</span>
                   </button>
                 )}
+                {onRetryAnalysis && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRetryAnalysis(); }}
+                    className="inline-flex items-center gap-0.5 px-2 py-1 rounded border border-stone-200 text-stone-400 hover:text-amber-500 hover:border-amber-300 text-[10px] transition-colors"
+                    title="重新用 AI 分析关键词"
+                  >
+                    <RotateCw size={9} />
+                    <span>重试</span>
+                  </button>
+                )}
               </>
             )}
           </div>
         ) : (
-          !card.isLoading && (
-            isAdding ? (
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+            {onRetryAnalysis && (
+              <button
+                onClick={(e) => { e.stopPropagation(); if (!card.isLoading) onRetryAnalysis(); }}
+                disabled={card.isLoading}
+                className="bg-white/80 px-2 py-1 rounded-sm shadow-sm backdrop-blur-sm inline-flex items-center gap-1 text-stone-500 hover:text-amber-600 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white/80 disabled:hover:text-stone-500"
+                title="重新用 AI 分析关键词"
+              >
+                <RotateCw size={9} />
+                <span className="text-[10px]">重试</span>
+              </button>
+            )}
+            {!card.isLoading && (isAdding ? (
               <div className="inline-flex items-center px-2 py-1 rounded bg-amber-50 border border-amber-200 shadow-sm backdrop-blur-sm text-[10px]">
                 <input
                   ref={addInputRef}
@@ -233,8 +264,8 @@ const PolaroidCard: React.FC<PolaroidCardProps> = ({ card, onDeleteTerm, onEditT
                 <Plus size={9} />
                 <span className="text-[10px] italic">添加标签</span>
               </button>
-            )
-          )
+            ))}
+          </div>
         )}
       </div>
 

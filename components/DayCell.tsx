@@ -13,6 +13,7 @@ interface DayCellProps {
   onDeleteTerm: (cardId: string, termId: string, dayIndex: DayIndex) => void;
   onEditTerm: (cardId: string, termId: string, newText: string, dayIndex: DayIndex) => void;
   onAddTerm: (cardId: string, text: string, dayIndex: DayIndex) => void;
+  onRetryAnalysis?: (cardId: string, dayIndex: DayIndex) => void;
   onFocusForPaste?: () => void;
   onBlurForPaste?: () => void;
   isWeekend?: boolean;
@@ -33,6 +34,7 @@ const DayCell: React.FC<DayCellProps> = ({
   onDeleteTerm,
   onEditTerm,
   onAddTerm,
+  onRetryAnalysis,
   onFocusForPaste,
   onBlurForPaste,
   isWeekend 
@@ -215,6 +217,7 @@ const DayCell: React.FC<DayCellProps> = ({
                     onDeleteTerm={(termId) => onDeleteTerm(card.id, termId, dayIndex)}
                     onEditTerm={(termId, newText) => onEditTerm(card.id, termId, newText, dayIndex)}
                     onAddTerm={(text) => onAddTerm(card.id, text, dayIndex)}
+                    onRetryAnalysis={onRetryAnalysis ? () => onRetryAnalysis(card.id, dayIndex) : undefined}
                   />
                 </div>
               ))}

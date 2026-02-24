@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Grid, Settings, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Grid, Settings, Sparkles, DatabaseBackup } from 'lucide-react';
 
 interface HeaderProps {
   currentDate: Date;
@@ -8,9 +8,10 @@ interface HeaderProps {
   onToday: () => void;
   onOpenConfig: () => void;
   onOpenInsights: () => void;
+  onOpenDataManage: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, onToday, onOpenConfig, onOpenInsights }) => {
+const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, onToday, onOpenConfig, onOpenInsights, onOpenDataManage }) => {
   const getMonthYear = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
@@ -54,6 +55,14 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onPrevWeek, onNextWeek, on
           aria-label="审美洞察"
         >
           <Sparkles size={20} />
+        </button>
+        <button
+          onClick={onOpenDataManage}
+          className="p-2 text-stone-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors"
+          title="数据备份 & 迁移"
+          aria-label="数据备份与迁移"
+        >
+          <DatabaseBackup size={20} />
         </button>
         <button
           onClick={onOpenConfig}

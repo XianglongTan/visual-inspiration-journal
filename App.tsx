@@ -3,6 +3,7 @@ import Header from './components/Header';
 import DayCell from './components/DayCell';
 import NotesArea from './components/NotesArea';
 import ConfigModal from './components/ConfigModal';
+import DataManageModal from './components/DataManageModal';
 import ScreenshotOverlay from './components/ScreenshotOverlay';
 import FloatingCaptureButton from './components/FloatingCaptureButton';
 import TermsInsightModal from './components/TermsInsightModal';
@@ -63,6 +64,7 @@ function App() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [insightsModalOpen, setInsightsModalOpen] = useState(false);
+  const [dataManageModalOpen, setDataManageModalOpen] = useState(false);
   const [pasteTargetDay, setPasteTargetDay] = useState<DayIndex | null>(null);
   const [screenshotMode, setScreenshotMode] = useState(false);
 
@@ -159,20 +161,30 @@ function App() {
       }));
 
       // Call API
-      const terms = await generateDesignTerms(result);
-      
-      // Update state with results
-      setData(prevData => {
-         const week = prevData[currentWeekId] || { ...INITIAL_WEEK_STATE, id: currentWeekId };
-         const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
-         const updatedCards = (days[dayIndex] || []).map(c => 
-            c.id === newCard.id 
+      try {
+        const terms = await generateDesignTerms(result);
+        setData(prevData => {
+          const week = prevData[currentWeekId] || { ...INITIAL_WEEK_STATE, id: currentWeekId };
+          const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
+          const updatedCards = (days[dayIndex] || []).map(c =>
+            c.id === newCard.id
               ? { ...c, isLoading: false, terms: terms.map(t => ({ id: uuidv4(), text: t })) }
               : c
-         );
-         days[dayIndex] = updatedCards;
-         return { ...prevData, [currentWeekId]: { ...week, days } };
-      });
+          );
+          days[dayIndex] = updatedCards;
+          return { ...prevData, [currentWeekId]: { ...week, days } };
+        });
+      } catch {
+        setData(prevData => {
+          const week = prevData[currentWeekId] || { ...INITIAL_WEEK_STATE, id: currentWeekId };
+          const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
+          const updatedCards = (days[dayIndex] || []).map(c =>
+            c.id === newCard.id ? { ...c, isLoading: false } : c
+          );
+          days[dayIndex] = updatedCards;
+          return { ...prevData, [currentWeekId]: { ...week, days } };
+        });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -251,6 +263,49 @@ function App() {
     cards[cardIndex] = updatedCard;
     updateWeekData({ days: { ...currentWeekData.days, [dayIndex]: cards } });
   };
+
+  // 重新请求大模型分析该卡片的关键词（用于分析失败后的重试）
+  const retryAnalysis = useCallback(async (cardId: string, dayIndex: DayIndex) => {
+    const weekId = getWeekId(currentDate);
+    const cards = currentWeekData.days[dayIndex] || [];
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    setData(prev => {
+      const week = prev[weekId] || { ...INITIAL_WEEK_STATE, id: weekId };
+      const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
+      const updatedCards = (days[dayIndex] || []).map(c =>
+        c.id === cardId ? { ...c, isLoading: true } : c
+      );
+      days[dayIndex] = updatedCards;
+      return { ...prev, [weekId]: { ...week, days } };
+    });
+
+    try {
+      const terms = await generateDesignTerms(card.url);
+      setData(prev => {
+        const week = prev[weekId] || { ...INITIAL_WEEK_STATE, id: weekId };
+        const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
+        const updatedCards = (days[dayIndex] || []).map(c =>
+          c.id === cardId
+            ? { ...c, isLoading: false, terms: terms.map(t => ({ id: uuidv4(), text: t })) }
+            : c
+        );
+        days[dayIndex] = updatedCards;
+        return { ...prev, [weekId]: { ...week, days } };
+      });
+    } catch {
+      setData(prev => {
+        const week = prev[weekId] || { ...INITIAL_WEEK_STATE, id: weekId };
+        const days = { ...INITIAL_WEEK_STATE.days, ...week.days };
+        const updatedCards = (days[dayIndex] || []).map(c =>
+          c.id === cardId ? { ...c, isLoading: false } : c
+        );
+        days[dayIndex] = updatedCards;
+        return { ...prev, [weekId]: { ...week, days } };
+      });
+    }
+  }, [currentDate, currentWeekData.days]);
 
   // 截屏完成后导入到「当天」对应的那一列（按当前日期所在周 + 星期几）
   const addScreenshotToToday = useCallback(async (dataUrl: string) => {
@@ -376,9 +431,19 @@ function App() {
         onToday={goToToday}
         onOpenConfig={() => setConfigModalOpen(true)}
         onOpenInsights={() => setInsightsModalOpen(true)}
+        onOpenDataManage={() => setDataManageModalOpen(true)}
       />
 
       <ConfigModal isOpen={configModalOpen} onClose={() => setConfigModalOpen(false)} />
+      <DataManageModal
+        isOpen={dataManageModalOpen}
+        onClose={() => setDataManageModalOpen(false)}
+        onImportSuccess={() => {
+          setDataManageModalOpen(false);
+          // 重新加载页面以刷新 IndexedDB 中的新数据
+          window.location.reload();
+        }}
+      />
       <TermsInsightModal
         isOpen={insightsModalOpen}
         onClose={() => setInsightsModalOpen(false)}
@@ -410,6 +475,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(0)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
               />
@@ -423,6 +489,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(1)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
               />
@@ -436,6 +503,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(2)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
               />
@@ -451,6 +519,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(3)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
               />
@@ -464,6 +533,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(4)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
               />
@@ -477,6 +547,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(5)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
                 isWeekend={true}
@@ -493,6 +564,7 @@ function App() {
                 onDeleteTerm={deleteTerm}
                 onEditTerm={editTerm}
                 onAddTerm={addTerm}
+                onRetryAnalysis={retryAnalysis}
                 onFocusForPaste={() => setPasteTargetDay(6)}
                 onBlurForPaste={() => setPasteTargetDay(null)}
                 isWeekend={true}

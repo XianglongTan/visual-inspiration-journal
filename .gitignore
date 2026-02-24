@@ -25,3 +25,6 @@ config.ts
 *.njsproj
 *.sln
 *.sw?
+
+dist/
+.cursor/
